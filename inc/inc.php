@@ -222,8 +222,8 @@ function wpdx_custom_admin_title($admin_title, $title){
  * 禁用REST API、移除wp-json链接
  */
 if( io_get_option('ioc_api') ) :
-    add_filter('rest_enabled', '_return_false');
-    add_filter('rest_jsonp_enabled', '_return_false');
+    add_filter('rest_enabled', '__return_false');
+    add_filter('rest_jsonp_enabled', '__return_false');
     remove_action( 'wp_head', 'rest_output_link_wp_head', 10 );
     remove_action( 'wp_head', 'wp_oembed_add_discovery_links', 10 );
 endif;
