@@ -6,9 +6,61 @@ WordPress 版 WebStack 导航主题 —— **安全加固分支**。
 若干安全漏洞与代码缺陷。**如果你正在使用原版 WebStack，强烈建议换用本分支**：原版存在
 未授权文件上传漏洞，可被直接上传 webshell 拿下服务器（详见下方「安全修复」）。
 
-- 原主题演示：<a href="http://webstack.iotheme.cn/">webstack.iotheme.cn</a>
+- 本分支演示站：<a href="https://tool.coinowo.com">tool.coinowo.com</a>
+- 上游原主题演示：<a href="http://webstack.iotheme.cn/">webstack.iotheme.cn</a>
 - 上游仓库：<a href="https://github.com/owen0o0/WebStack" target="_blank">owen0o0/WebStack</a>
 - 本分支修复记录：<a href="CHANGELOG.md">CHANGELOG.md</a>
+
+<br/>
+
+## 🔴 我们为什么做这个分支
+
+我是这个主题的用户。2026 年 10 月，我跑 WebStack 的服务器被入侵了。
+
+先是 CPU 突然 100%，查到在挖矿。杀了进程，清了 cron 和 systemd，
+以为是偶然。**十天后又被挂上挖矿**——这次才发现问题不在"清理不干净"，
+而是**入侵入口从来没被堵上**。
+
+排查结果很糟：
+
+- 旧服务器上 `tool.coinowo.com`（就是 WebStack 这个站）的
+  `wp-content/uploads/` 目录里躺着 **90 个 webshell**，用各种 PHP 变体扩展名伪装：
+
+  | 扩展名 | 数量 |
+  |---|---|
+  | `.php` | 41 |
+  | `.phtml` | 12 |
+  | `.pht` | 7 |
+  | `.php7` | 6 |
+  | `.php5` | 6 |
+  | `.phar` | 6 |
+
+- 最新一个的写入时间是 **2026-11-15**，也就是清理后半个多月，攻击者仍在往里写文件
+- 服务器上有 6 层持久化：systemd 服务与定时器、`@reboot` cron、
+  `profile.d` 里劫持 `ps`/`ss`/`netstat` 的 shell 函数、
+  **全部 40 个 `/etc/init.d/` 脚本被注入**、`chattr +i` 锁定的文件
+- 攻击者还设了 watchdog 进程：CPU 占用 0%，`/proc/PID/exe` 读不到，
+  只有看完整命令行才能发现
+
+入口就是这个主题的 `inc/ajax.php`：上传接口挂在 `nopriv`（未登录可访问）钩子上，
+白名单数组定义了却从未使用。任何人不登录就能往 uploads 目录写 `.php`。
+
+**这不是"配置不当"，是主题代码本身的漏洞。** 上游 issue
+[#78](https://github.com/owen0o0/WebStack/issues/78) 和
+[#76](https://github.com/owen0o0/WebStack/issues/76) 都报告了这个问题，
+但截至本分支创建时仍未修复。
+
+所以我把修好的版本放出来。改的地方不多，但都是要命的。
+
+> 如果你现在正在用原版 WebStack，**请立刻检查你的 `wp-content/uploads/` 目录**：
+>
+> ```bash
+> find wp-content/uploads -type f \( -iname "*.php*" -o -iname "*.pht*" \
+>   -o -iname "*.phar" -o -iname "*.phps" -o -iname "*.inc" \) -print
+> ```
+>
+> 输出不为空就说明已经被打进来了。**注意：只按 `*.php` 搜会漏掉一大半**，
+> 我们那 90 个里只有 41 个是 `.php`。
 
 <br/>
 

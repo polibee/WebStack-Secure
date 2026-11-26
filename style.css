@@ -1,13 +1,13 @@
 /*	
-Theme Name:WebStack
-Theme URI:https://www.iotheme.cn
-Description:wordpress 导航主题！官方网站：<a href="https://www.iotheme.cn">一为主题</a>，</br><a href="https://www.iotheme.cn/store/onenav.html">升级到最新的OneNav导航主题</a>，体验更多功能 
-Version:1.2025
+Theme Name:WebStack-Secure
+Theme URI:https://github.com/polibee/WebStack-Secure
+Description:WordPress 导航主题 WebStack 的安全加固分支，修复未授权文件上传等高危漏洞。演示站：<a href="https://tool.coinowo.com">tool.coinowo.com</a>；上游原主题：<a href="https://github.com/owen0o0/WebStack">owen0o0/WebStack</a>
+Version:1.2025-secure.1
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 5.6
-Author:iowen, LoveDoLove
-Author URI: https://www.iowen.cn/
+Author:iowen, LoveDoLove (secure fork by polibee)
+Author URI: https://github.com/polibee/WebStack-Secure
 License URI: https://www.iotheme.cn/disclaimer
 Text Domain: i_theme
 Domain Path: /languages

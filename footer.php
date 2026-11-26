@@ -1,7 +1,7 @@
 <?php 
 /*
- * @Theme Name:WebStack
- * @Theme URI:https://github.com/owen0o0/WebStack
+ * @Theme Name:WebStack-Secure
+ * @Theme URI:https://github.com/polibee/WebStack-Secure
  * @Author: iowen
  * @Author URI: https://www.iowen.cn/
  * @Date: 2019-02-22 21:26:02
@@ -31,7 +31,7 @@ if ($police_icp = io_get_option('police_icp')) {
                     <!---请保留版权说明，谢谢---->
                     <div class="footer-text">
                         Copyright © <?php echo date('Y') ?> <?php bloginfo('name'); ?> <?php echo $_icp ?>
-                        &nbsp;&nbsp;Design by <a href="https://github.com/WebStackPage/WebStackPage.github.io" target="_blank"><strong>Webstack</strong></a>&nbsp;&nbsp;Modify by <a href="https://github.com/owen0o0/WebStack" target="_blank"><strong>iowen</strong></a>
+                        &nbsp;&nbsp;Design by <a href="https://github.com/WebStackPage/WebStackPage.github.io" target="_blank"><strong>Webstack</strong></a>&nbsp;&nbsp;Modify by <a href="https://github.com/owen0o0/WebStack" target="_blank"><strong>iowen</strong></a>&nbsp;&nbsp;Security fixes by <a href="https://github.com/polibee/WebStack-Secure" target="_blank"><strong>polibee</strong></a>
                     </div>
                     <!---请保留版权说明，谢谢---->
                 </div>
