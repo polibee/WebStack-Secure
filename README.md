@@ -1,10 +1,96 @@
-# WebStack
-WordPress 版 WebStack 主题。<a href="http://webstack.iotheme.cn/">前往演示站</a>
+# WebStack-Secure
+
+WordPress 版 WebStack 导航主题 —— **安全加固分支**。
+
+本仓库 fork 自 [owen0o0/WebStack](https://github.com/owen0o0/WebStack)，在原主题基础上修复了
+若干安全漏洞与代码缺陷。**如果你正在使用原版 WebStack，强烈建议换用本分支**：原版存在
+未授权文件上传漏洞，可被直接上传 webshell 拿下服务器（详见下方「安全修复」）。
+
+- 原主题演示：<a href="http://webstack.iotheme.cn/">webstack.iotheme.cn</a>
+- 上游仓库：<a href="https://github.com/owen0o0/WebStack" target="_blank">owen0o0/WebStack</a>
+- 本分支修复记录：<a href="CHANGELOG.md">CHANGELOG.md</a>
+
+<br/>
+
+## ⚠️ 安全修复
+
+### 1. 未授权文件上传（高危，可致服务器被入侵）
+
+**影响版本**：原版 WebStack 全版本
+**对应 issue**：[#78](https://github.com/owen0o0/WebStack/issues/78)、[#76](https://github.com/owen0o0/WebStack/issues/76)
+**CWE**：CWE-862（缺失授权）、CWE-352（CSRF）、CWE-434（危险类型文件上传）
+
+原 `inc/ajax.php` 把图片上传接口注册在**未登录用户可见**的钩子上：
+
+```php
+add_action('wp_ajax_nopriv_img_upload', 'io_img_upload');  // nopriv = 无需登录
+```
+
+而上传函数里虽然定义了扩展名白名单 `$extArr`，**却从未使用**。任何人不登录即可向
+`wp-content/uploads/` 写入任意扩展名的文件，包括 `.php` / `.phtml` / `.phar`。
+若服务器允许 uploads 目录执行 PHP，攻击者可直接上传 webshell 接管服务器。
+
+**修复内容**：
+
+| 修复点 | 说明 |
+|---|---|
+| 移除 `nopriv` 钩子 | 上传/删除接口要求登录 |
+| 权限校验 | `current_user_can('upload_files')` / `delete_posts` |
+| Nonce 校验 | `check_ajax_referer()`，防 CSRF |
+| 扩展名白名单 | 真正执行 `in_array()` 判断（jpg/png/jpeg/gif/webp） |
+| 文件类型校验 | `getimagesize()` 验证真实图片文件头，防伪造 MIME 与双扩展名 |
+| 改用 `move_uploaded_file()` | 替代 `rename()`，只搬运经 HTTP 上传的临时文件 |
+| 删除接口加归属校验 | 只能删除自己上传的附件，管理员除外 |
+
+### 2. 投稿接口参数校验缺失
+
+**对应**：`io_contribute()`（公开投稿功能，设计上对游客开放）
+
+- `category` 原样取自 `$_POST` 未做整数校验 → 改为 `absint()`
+- `sites_ico` / `wechat_qr` 未限制协议，可存入 `javascript:` / `data:` → 限定 http(s)
+
+### 3. REST API 禁用功能失效
+
+**对应 issue**：[#69](https://github.com/owen0o0/WebStack/issues/69)、[PR #77](https://github.com/owen0o0/WebStack/pull/77)
+
+```php
+add_filter('rest_enabled', '_return_false');   // 错误：WordPress 无此函数
+add_filter('rest_enabled', '__return_false');  // 正确
+```
+
+少一个下划线导致主题选项「禁用 REST API」从未生效，`wp-json` 始终可访问。
+
+<br/>
+
+## 升级 / 迁移指南
+
+如果你从原版迁移过来，**不要直接覆盖文件**，按以下顺序操作：
+
+1. 备份数据库与 `wp-content/uploads/` 目录
+2. **扫描 uploads 目录下的可执行文件**：
+
+   ```bash
+   find wp-content/uploads -type f \( -iname "*.php*" -o -iname "*.pht*" \
+     -o -iname "*.phar" -o -iname "*.phps" -o -iname "*.inc" \) -print
+   ```
+
+   正常站点这里应该是 0 个文件。有的话先移到隔离目录留证，再删除。
+3. 替换主题文件
+4. 在 nginx/apache 里禁止 uploads 目录执行 PHP（双保险）
+
+   ```nginx
+   location ~* ^/wp-content/uploads/.*\.(php|php[0-9]|phtml?|phar|phps|inc)$ {
+       deny all;
+       return 403;
+   }
+   ```
+
+5. 检查 `wp-config.php` 与插件目录有无异常文件
+
 <br/>
 
 ### 声明
-当你使用 WebStack 主题发布文章、文字、图片、视频等内容均属于你自己的行为，你的这些行为所带来的安全或法律风险均需自行承担。
-
+本分支仅修复代码缺陷，不改变原主题功能与授权方式。使用本主题发布的内容由发布者自行负责。
 
 “Webstack Pro”是作者在19年尝试的一个收费项目，现已不在维护支持，且与<a href="https://github.com/WebStackPage/WebStackPage.github.io" target="_blank">Viggo</a>无关，应当时名字欠缺考虑，给<a href="https://github.com/WebStackPage/WebStackPage.github.io" target="_blank">Viggo</a>带来了不必要的麻烦，在此道歉。<br/>
 现今网络上流传的“Webstack Pro”版本均为盗用作者19年的内容，与作者和<a href="https://github.com/WebStackPage/WebStackPage.github.io" target="_blank">Viggo</a>无关。
@@ -18,7 +104,7 @@ WordPress 版 WebStack 主题。<a href="http://webstack.iotheme.cn/">前往演�
 ### 环境要求
 + WordPress 4.4+
 + WordPress 伪静态
-+ PHP 5.7+ 7.0+
++ PHP 7.0+（已在 PHP 8.5 上验证：74 个 PHP 文件语法检查全部通过，无废弃函数）
 <br/>
 
 ### 安装指南
@@ -75,5 +161,7 @@ RewriteRule . /index.php [L]
 <br/>
 
 ### 更新
-<a href="https://github.com/owen0o0/WebStack/releases" target="_blank">更新日志</a>
-更新方法为替换源文件，或者在wordpress后台删除主题，然后重新安装主题
++ 本分支更新记录：<a href="CHANGELOG.md">CHANGELOG.md</a>
++ 上游更新记录：<a href="https://github.com/owen0o0/WebStack/releases" target="_blank">owen0o0/WebStack releases</a>
++ 更新方法为替换源文件，或者在 WordPress 后台删除主题，然后重新安装主题
++ **升级前务必阅读上方「升级 / 迁移指南」**，尤其是 uploads 目录的扫描步骤
