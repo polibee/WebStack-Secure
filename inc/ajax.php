@@ -2,18 +2,45 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 //图片上传
-add_action('wp_ajax_nopriv_img_upload', 'io_img_upload');  
+// 安全修复(2026-11-26)：原代码对未登录用户开放上传，且 $extArr 定义后从未使用，
+// 导致任意扩展名（含 .php/.phtml/.phar）可直达 uploads 目录 —— 这是旧站被植入
+// webshell 的入口。修复点：①去掉 nopriv 钩子，要求登录；②加 nonce 校验；
+// ③按扩展名白名单 + 真实图片类型双重验证；④显式拒绝 uploads 目录内的可执行后缀。
 add_action('wp_ajax_img_upload', 'io_img_upload');
 function io_img_upload(){  
-	$extArr = array("jpg", "png", "jpeg");
-	$file = $_FILES['files'];
+	$extArr = array("jpg", "png", "jpeg", "gif", "webp");
+	if ( ! is_user_logged_in() || ! current_user_can( 'upload_files' ) ) {
+		status_header( 403 );
+		echo json_encode( array( 'status' => 0, 'msg' => __( '无权上传', 'i_theme' ) ) );
+		exit;
+	}
+	check_ajax_referer( 'io_img_upload', 'nonce' );
+	$file = isset( $_FILES['files'] ) ? $_FILES['files'] : null;
 	if ( !empty( $file ) ) {
 	    $wp_upload_dir = wp_upload_dir();                                     // 获取上传目录信息
 	    $basename = $file['name'];
-	    $baseext = pathinfo($basename, PATHINFO_EXTENSION);
+	    $baseext = strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) );
+	    // 扩展名白名单
+	    if ( ! in_array( $baseext, $extArr, true ) ) {
+	        status_header( 400 );
+	        echo json_encode( array( 'status' => 0, 'msg' => __( '只允许上传图片', 'i_theme' ) ) );
+	        exit;
+	    }
+	    // 真实图片类型校验：文件头必须是图片，防止双扩展名 / 伪造 mime
+	    $imginfo = @getimagesize( $file['tmp_name'] );
+	    if ( false === $imginfo || empty( $imginfo['mime'] ) || 0 !== strpos( $imginfo['mime'], 'image/' ) ) {
+	        status_header( 400 );
+	        echo json_encode( array( 'status' => 0, 'msg' => __( '文件不是有效图片', 'i_theme' ) ) );
+	        exit;
+	    }
 	    $dataname = date("YmdHis_").substr(md5(time()), 0, 8) . '.' . $baseext;
 	    $filename = $wp_upload_dir['path'] . '/' . $dataname;
-	    rename( $file['tmp_name'], $filename );                               // 将上传的图片文件移动到上传目录
+	    // 用 move_uploaded_file 而非 rename，确保只搬运真正经 HTTP 上传的临时文件
+	    if ( ! @move_uploaded_file( $file['tmp_name'], $filename ) ) {
+	        status_header( 500 );
+	        echo json_encode( array( 'status' => 0, 'msg' => __( '保存失败', 'i_theme' ) ) );
+	        exit;
+	    }
 	    $attachment = array(
 	        'guid'           => $wp_upload_dir['url'] . '/' . $dataname,      // 外部链接的 url
 	        'post_mime_type' => $file['type'],                                // 文件 mime 类型
@@ -36,12 +63,29 @@ function io_img_upload(){
 }
 
 //删除图片
-add_action('wp_ajax_nopriv_img_remove', 'io_img_remove');  
+// 安全修复(2026-11-26)：原代码 nopriv + 无归属校验，任何人可删任意附件。
 add_action('wp_ajax_img_remove', 'io_img_remove');
 function io_img_remove(){    
-	$attach_id = $_POST["id"];
-	if( empty($attach_id) ){
+	if ( ! is_user_logged_in() || ! current_user_can( 'delete_posts' ) ) {
+		status_header( 403 );
+		echo json_encode( array( 'status' => 0, 'msg' => __( '无权删除', 'i_theme' ) ) );
+		exit;
+	}
+	check_ajax_referer( 'io_img_remove', 'nonce' );
+	$attach_id = absint( isset( $_POST['id'] ) ? $_POST['id'] : 0 );
+	if( empty( $attach_id ) ){
 		echo '{"status":3,"msg":"'.__('没有上传图像！','i_theme').'"}';
+		exit;
+	}
+	// 只能删自己上传的附件，管理员除外
+	$att = get_post( $attach_id );
+	if ( ! $att || 'attachment' !== $att->post_type ) {
+		echo '{"status":3,"msg":"'.__('附件不存在','i_theme').'"}';
+		exit;
+	}
+	if ( (int) $att->post_author !== get_current_user_id() && ! current_user_can( 'manage_options' ) ) {
+		status_header( 403 );
+		echo json_encode( array( 'status' => 0, 'msg' => __( '只能删除自己上传的图片', 'i_theme' ) ) );
 		exit;
 	}
 	if ( false === wp_delete_attachment( $attach_id ) )
@@ -65,9 +109,22 @@ function io_contribute(){
 	$sites_sescribe = isset( $_POST['tougao_sites_sescribe'] ) ? trim(htmlspecialchars($_POST['tougao_sites_sescribe'], ENT_QUOTES)) : '';
 	$title = isset( $_POST['tougao_title'] ) ? trim(htmlspecialchars($_POST['tougao_title'], ENT_QUOTES)) : '';
 	$category = isset( $_POST['tougao_cat'] ) ? $_POST['tougao_cat'] : '0';
-	$sites_ico = isset( $_POST['tougao_sites_ico'] ) ? trim(htmlspecialchars($_POST['tougao_sites_ico'], ENT_QUOTES)) : '';
-	$wechat_qr = isset( $_POST['tougao_wechat_qr'] ) ? trim(htmlspecialchars($_POST['tougao_wechat_qr'], ENT_QUOTES)) : '';
+	$sites_ico = isset( $_POST['tougao_sites_ico'] ) ? trim(esc_url_raw($_POST['tougao_sites_ico'])) : '';
+	$wechat_qr = isset( $_POST['tougao_wechat_qr'] ) ? trim(esc_url_raw($_POST['tougao_wechat_qr'])) : '';
 	$content = isset( $_POST['tougao_content'] ) ? trim(htmlspecialchars($_POST['tougao_content'], ENT_QUOTES)) : '';
+	
+	// 安全修复(2026-11-26)：category 原样取自 POST 未做整数校验，可注入任意分类 ID；
+	// sites_ico / wechat_qr 也未限制协议，javascript: 之流能存进数据库后被前端直接输出。
+	$category = absint( $category );
+	if ( ! $category ) {
+		error('{"status":4,"msg":"'.__('请选择分类。','i_theme').'"}');
+	}
+	// 只接受 http(s)，挡住 javascript:/data: 等伪协议
+	foreach ( array( 'sites_ico' => $sites_ico, 'wechat_qr' => $wechat_qr ) as $k => $v ) {
+		if ( '' !== $v && ! preg_match( '#^https?://#i', $v ) ) {
+			error('{"status":4,"msg":"'.__('链接必须以 http:// 或 https:// 开头。','i_theme').'"}');
+		}
+	}
 	
 	// 表单项数据验证
 	if ( $category == "0" ){

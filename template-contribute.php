@@ -174,6 +174,7 @@ include( 'templates/header-nav.php' );
             var formData = new FormData();
             formData.append('files', file.files[0]);
             formData.append('action','img_upload');
+            formData.append('nonce', theme.nonce_upload);
     	    $.ajax({
     	        url: theme.ajaxurl,
                 type: 'POST',
@@ -210,6 +211,7 @@ include( 'templates/header-nav.php' );
             dataType: 'json',
             data: {
 				action: "img_remove",
+				nonce: theme.nonce_remove,
 				id: $(this).data("id")
 			}
         }).done(function (result) {

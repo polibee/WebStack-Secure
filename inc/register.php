@@ -47,6 +47,10 @@ function theme_load_scripts() {
 		'ajaxurl' => admin_url( 'admin-ajax.php' ),
 		'addico'  => get_theme_file_uri('/images/add.png'),
 		'version' => $theme_version,
+		// 安全修复(2026-11-26)：上传/删除接口改为需登录 + nonce 校验，
+		// 前端须带上对应动作的 nonce，否则投稿页图片上传会 403。
+		'nonce_upload' => wp_create_nonce( 'io_img_upload' ),
+		'nonce_remove' => wp_create_nonce( 'io_img_remove' ),
 	)); 
 }
 add_action('wp_enqueue_scripts', 'theme_load_scripts');
